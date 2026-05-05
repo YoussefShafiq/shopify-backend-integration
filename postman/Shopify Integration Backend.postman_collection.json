@@ -1,0 +1,257 @@
+{
+  "info": {
+    "name": "Shopify Integration Backend",
+    "description": "Local dev collection for testing Shopify webhooks + supplier→Shopify bridge.\n\nImportant:\n- `/shopify/webhook/orders/create` requires HMAC header `X-Shopify-Hmac-Sha256` unless you set `SKIP_SHOPIFY_WEBHOOK_HMAC=1` and run in `NODE_ENV=dev`.\n- The orders/create webhook persists the full order payload into MongoDB `orders` collection via `Order` model.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "item": [
+    {
+      "name": "Shopify → Backend",
+      "item": [
+        {
+          "name": "Orders Create Webhook (signed HMAC)",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const skip = (pm.environment.get('skipHmac') || 'false').toLowerCase() === 'true';",
+                  "if (skip) {",
+                  "  // For dev-only bypass, set SKIP_SHOPIFY_WEBHOOK_HMAC=1 in configs/.env.dev and restart the server.",
+                  "  pm.request.headers.remove('X-Shopify-Hmac-Sha256');",
+                  "  return;",
+                  "}",
+                  "",
+                  "const secret = pm.environment.get('shopifyWebhookSecret');",
+                  "if (!secret) {",
+                  "  throw new Error('Missing environment variable shopifyWebhookSecret. Set it to SHOPIFY_WEBHOOK_SECRET used by the server.');",
+                  "}",
+                  "",
+                  "const rawBody = pm.request.body && pm.request.body.raw ? pm.request.body.raw : '';",
+                  "const signature = CryptoJS.enc.Base64.stringify(",
+                  "  CryptoJS.HmacSHA256(rawBody, CryptoJS.enc.Utf8.parse(secret))",
+                  ");",
+                  "pm.request.headers.upsert({ key: 'X-Shopify-Hmac-Sha256', value: signature });"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/shopify/webhook/orders/create",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "shopify",
+                "webhook",
+                "orders",
+                "create"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{{shopifyOrderCreatePayload}}"
+            },
+            "description": "Simulates Shopify `orders/create` webhook. Persists the full JSON into MongoDB `orders` collection (fields: shopifyOrderId + shopifyPayload). Then triggers fulfillment-order processing via Admin API."
+          },
+          "response": []
+        },
+        {
+          "name": "Orders Create Webhook (dev bypass - no HMAC)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/shopify/webhook/orders/create",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "shopify",
+                "webhook",
+                "orders",
+                "create"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{{shopifyOrderCreatePayload}}"
+            },
+            "description": "Requires backend env: NODE_ENV=dev and SKIP_SHOPIFY_WEBHOOK_HMAC=1 (configs/.env.dev). Then you can call without X-Shopify-Hmac-Sha256."
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Supplier → Backend → Shopify Admin",
+      "item": [
+        {
+          "name": "Create Product in Shopify",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/supplier/webhook/shopify/product/create",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "supplier",
+                "webhook",
+                "shopify",
+                "product",
+                "create"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"product\": {\n    \"title\": \"Example product from supplier\",\n    \"body_html\": \"<strong>Example</strong>\",\n    \"vendor\": \"Supplier\",\n    \"product_type\": \"Demo\",\n    \"status\": \"active\"\n  }\n}"
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Update Product in Shopify",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/supplier/webhook/shopify/product/update",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "supplier",
+                "webhook",
+                "shopify",
+                "product",
+                "update"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"productId\": \"{{productId}}\",\n  \"product\": {\n    \"title\": \"Updated title from supplier\"\n  }\n}"
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Delete Product in Shopify",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/supplier/webhook/shopify/product/delete",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "supplier",
+                "webhook",
+                "shopify",
+                "product",
+                "delete"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"productId\": \"{{productId}}\"\n}"
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Set Inventory Level",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/supplier/webhook/shopify/inventory/set",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "supplier",
+                "webhook",
+                "shopify",
+                "inventory",
+                "set"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"locationId\": \"{{locationId}}\",\n  \"inventoryItemId\": \"{{inventoryItemId}}\",\n  \"available\": 10\n}"
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Create Fulfillment (for a Fulfillment Order)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/supplier/webhook/shopify/fulfillment/create",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "supplier",
+                "webhook",
+                "shopify",
+                "fulfillment",
+                "create"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"fulfillmentOrderId\": \"{{fulfillmentOrderId}}\",\n  \"fulfillmentOrderLineItems\": [\n    { \"id\": 123, \"quantity\": 1 }\n  ],\n  \"tracking\": {\n    \"number\": \"TRACK123\",\n    \"company\": \"Carrier\",\n    \"url\": \"https://tracking.example.com/TRACK123\"\n  },\n  \"notifyCustomer\": false,\n  \"message\": \"Shipped\"\n}"
+            }
+          },
+          "response": []
+        }
+      ]
+    }
+  ]
+}
+

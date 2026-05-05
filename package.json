@@ -1,0 +1,36 @@
+{
+  "name": "assignment-6",
+  "version": "1.0.0",
+  "description": "",
+  "main": "./src/main.js",
+  "scripts": {
+    "start:dev": "cross-env NODE_ENV=dev node --watch ./src/main.js",
+    "start": "node ./src/main.js",
+    "start:prod": "cross-env NODE_ENV=prod node ./src/main.js"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "module",
+  "dependencies": {
+    "@shopify/shopify-api": "^13.0.0",
+    "axios": "^1.15.2",
+    "bcryptjs": "^3.0.3",
+    "cookie-parser": "^1.4.7",
+    "cors": "^2.8.6",
+    "cross-env": "^10.1.0",
+    "crypto-js": "^4.2.0",
+    "dotenv": "^17.2.3",
+    "express": "^5.2.1",
+    "express-rate-limit": "^8.3.2",
+    "google-auth-library": "^10.6.1",
+    "helmet": "^8.1.0",
+    "joi": "^18.0.2",
+    "jsonwebtoken": "^9.0.3",
+    "mongodb": "^7.1.0",
+    "mongoose": "^9.2.1",
+    "multer": "^2.1.1",
+    "nodemailer": "^8.0.1",
+    "redis": "^5.11.0"
+  }
+}
