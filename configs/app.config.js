@@ -46,4 +46,20 @@ export const SKIP_SHOPIFY_WEBHOOK_HMAC =
     process.env.SKIP_SHOPIFY_WEBHOOK_HMAC === 'true'
 
 export const SHOPIFY_API_URL = process.env.SHOPIFY_API_URL || ''
+
+/** Dev Dashboard app — used with client credentials grant (recommended; token auto-refreshes every ~24h). */
+export const SHOPIFY_CLIENT_ID =
+    process.env.SHOPIFY_CLIENT_ID ||
+    process.env.client_id ||
+    ''
+
+export const SHOPIFY_CLIENT_SECRET =
+    process.env.SHOPIFY_CLIENT_SECRET ||
+    process.env.client_secret ||
+    ''
+
+/** Optional fallback: static offline Admin token. Prefer SHOPIFY_CLIENT_ID + SHOPIFY_CLIENT_SECRET. */
 export const SHOPIFY_ACCESS_TOKEN = process.env.SHOPIFY_ACCESS_TOKEN || ''
+
+/** Comma-separated hostnames allowed for server-side supplier image fetch (e.g. `odoo`, `host.docker.internal`). Localhost is always allowed. */
+export const SUPPLIER_IMAGE_FETCH_EXTRA_HOSTS = process.env.SUPPLIER_IMAGE_FETCH_EXTRA_HOSTS || ''

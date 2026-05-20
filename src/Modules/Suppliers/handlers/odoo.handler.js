@@ -1,13 +1,20 @@
 import axios from "axios";
 import crypto from "crypto";
+import { findOne } from "../../../DB/Repository/get.repo.js";
+import supplierModel from "../../../DB/Models/supplier.model.js";
 import { unhandledException } from "../../../utils/response/failResponse.js";
-import { SupplierHandler } from "./supplierHandler.base.js";
+import {
+    findAllShopifyProductIdsByOdooProductId,
+    resolveSupplierProductIdToShopifyProductId,
+    resolveSupplierInventoryItemIdToShopifyInventoryItemId,
+    syncOdooInventoryItemMetafieldsFromSupplierVariants,
+} from "../../Shopify/shopifyAdmin.service.js";
+import { mapOdooProductForShopify } from "../mappers/odooShopifyProductMapper.js";
+import { SupplierHandler, resolveSupplierLocationIdViaDb } from "./supplierHandler.base.js";
 
 function mapFulfillmentOrderToOdooJsonRpcPayload({ fo, supplierCode, requestId }) {
     const destination = fo?.destination ?? {};
     const name = [destination?.first_name, destination?.last_name].filter(Boolean).join(" ").trim();
-
-    console.log('2- mapFulfillmentOrderToOdooJsonRpcPayload---------------------------------------------');
 
     return {
         jsonrpc: "2.0",
@@ -28,7 +35,6 @@ function mapFulfillmentOrderToOdooJsonRpcPayload({ fo, supplierCode, requestId }
                 email: destination?.email ?? "",
             },
             lines: (fo?.line_items ?? []).map((li) => ({
-                // Shopify FO payload doesn't include SKU by default; prefer explicit `sku` if it exists, otherwise empty string.
                 sku: li?.sku ?? "",
                 quantity: li?.quantity ?? 0,
                 shopify_fo_line_item_id: String(li?.id ?? ""),
@@ -40,31 +46,18 @@ function mapFulfillmentOrderToOdooJsonRpcPayload({ fo, supplierCode, requestId }
 }
 
 /**
- * Odoo supplier handler
- * This handler is responsible for creating/upserting a supplier order in Odoo based on a Shopify Fulfillment Order (FO).
- * It extends the abstract SupplierHandler class and implements the createSupplierOrderFromFulfillmentOrder method.
- * It uses the Odoo API to create/upsert the order.
- * It uses the Odoo API to create/upsert the order.
+ * Odoo supplier: Shopify fulfillment orders → Odoo API, and Odoo webhooks → Shopify Admin API.
  */
 export class OdooSupplierHandler extends SupplierHandler {
-    constructor(configuration) {
-        super(configuration);
-    }
-
     async createSupplierOrderFromFulfillmentOrder({ fo, supplier }) {
-        console.log('1- odoo createSupplierOrderFromFulfillmentOrder---------------------------------------------');
-
         const { baseUrl, apiKey } = this.configuration ?? {};
         const { shopify_location_id: supplierCode } = supplier ?? {};
-        console.log({ supplier });
 
-        if (!baseUrl) throw unhandledException('Odoo supplier configuration missing baseUrl');
-        if (!supplierCode) throw unhandledException('Odoo supplier configuration missing supplierCode');
+        if (!baseUrl) throw unhandledException("Odoo supplier configuration missing baseUrl");
+        if (!supplierCode) throw unhandledException("Odoo supplier configuration missing supplierCode");
 
-        // TODO: replace with your real Odoo endpoint + auth mechanism
-        // Keeping it non-blocking for now: if you don't have Odoo ready, log payload shape.
         if (!apiKey) {
-            console.warn('[OdooSupplierHandler] Missing apiKey; skipping remote call', {
+            console.warn("[OdooSupplierHandler] Missing apiKey; skipping remote call", {
                 supplierId: supplier?._id,
                 shopifyLocationId: supplier?.shopify_location_id,
                 fulfillmentOrderId: fo?.id,
@@ -80,28 +73,71 @@ export class OdooSupplierHandler extends SupplierHandler {
             requestId,
         });
 
-        console.log('3- payload---------------------------------------------', { payload });
-
-        console.log("[OdooSupplierHandler] Sending mapped JSON-RPC payload", payload);
-
         const headers = {
             Authorization: `Bearer ${apiKey}`,
-            'Content-Type': 'application/json',
-        }
+            "Content-Type": "application/json",
+        };
 
-        console.log('4- headers---------------------------------------------', { headers });
-        console.log('5- Url---------------------------------------------', `${baseUrl.replace(/\/+$/, '')}/connector/v1/fulfillment_orders/upsert`);
         const { data } = await axios.post(
-            `${baseUrl.replace(/\/+$/, '')}/connector/v1/fulfillment_orders/upsert`,
+            `${baseUrl.replace(/\/+$/, "")}/connector/v1/fulfillment_orders/upsert`,
             payload,
             {
                 headers,
                 timeout: 30_000,
-            }
+            },
         );
-        console.log('6- data---------------------------------------------', { data });
 
         return data;
     }
+
+    async mapProductForShopify(product) {
+        return mapOdooProductForShopify(product);
+    }
+
+    async resolveProductIdToShopifyProductId(productId) {
+        return resolveSupplierProductIdToShopifyProductId(productId);
+    }
+
+    async findAllShopifyProductIdsForSupplierProductId(productId) {
+        return findAllShopifyProductIdsByOdooProductId(productId);
+    }
+
+    async resolveInventoryItemIdToShopifyInventoryItemId(inventoryItemId) {
+        return resolveSupplierInventoryItemIdToShopifyInventoryItemId(inventoryItemId);
+    }
+
+    async syncInventoryMetafieldsFromSupplierVariants(supplierVariants, shopifyProduct) {
+        return syncOdooInventoryItemMetafieldsFromSupplierVariants(supplierVariants, shopifyProduct);
+    }
+
+    async resolveLocationIdToShopifyLocationId({ locationId, supplier, supplier_code }) {
+        const resolvedSupplier = await resolveOdooSupplierForLocationWebhook({
+            locationId,
+            supplier_code,
+            supplier,
+        });
+        return resolveSupplierLocationIdViaDb({ locationId, supplier: resolvedSupplier });
+    }
 }
 
+/**
+ * Odoo webhooks may send `supplier_code` after `locationId` lookup by warehouse code.
+ */
+export async function resolveOdooSupplierForLocationWebhook({ locationId, supplier_code, supplier }) {
+    if (supplier) return supplier;
+
+    const locStr = String(locationId ?? "").trim();
+    const code = typeof supplier_code === "string" ? supplier_code.trim() : "";
+
+    let resolved = await findOne(supplierModel, {
+        shopify_location_id: locStr,
+        isDeleted: { $ne: true },
+    });
+    if (!resolved && code) {
+        resolved = await findOne(supplierModel, {
+            shopify_location_id: code,
+            isDeleted: { $ne: true },
+        });
+    }
+    return resolved;
+}

@@ -5,6 +5,7 @@ const shopifyResourceId = Joi.alternatives(Joi.string(), Joi.number()).required(
 export const createProductSchema = {
     body: Joi.object({
         product: Joi.object().required(),
+        supplier_code: Joi.string().optional(),
     }).required(),
 };
 
@@ -12,12 +13,14 @@ export const updateProductSchema = {
     body: Joi.object({
         productId: shopifyResourceId,
         product: Joi.object().required(),
+        supplier_code: Joi.string().optional(),
     }).required(),
 };
 
 export const deleteProductSchema = {
     body: Joi.object({
         productId: shopifyResourceId,
+        supplier_code: Joi.string().optional(),
     }).required(),
 };
 
@@ -26,6 +29,7 @@ export const setInventorySchema = {
         locationId: shopifyResourceId,
         inventoryItemId: shopifyResourceId,
         available: Joi.number().integer().min(0).required(),
+        supplier_code: Joi.string().optional(),
     }).required(),
 };
 

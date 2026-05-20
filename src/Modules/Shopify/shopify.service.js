@@ -13,43 +13,43 @@ import { getSupplierHandler } from "../Suppliers/handlers/index.js";
 export async function getFulfillmentByOrderId(orderId) {
     const client = getShopifyAdminClient();
 
-    const { data } = await client.get(`/orders/${String(orderId)}/fulfillment_orders.json`);
-    // const data = {
-    //     "fulfillment_orders": [
-    //         {
-    //             "id": 1046000804,
-    //             "order_id": 450789460,
-    //             "status": "open",
-    //             "request_status": "unsubmitted",
-    //             "assigned_location_id": 'clouds-tex-001',
-    //             "destination": {
-    //                 "first_name": "John",
-    //                 "last_name": "Doe",
-    //                 "address1": "12 Abbas El Akkad St",
-    //                 "address2": null,
-    //                 "city": "Cairo",
-    //                 "province": "Cairo",
-    //                 "country": "Egypt",
-    //                 "zip": "11765",
-    //                 "phone": "+20123456789",
-    //                 "email": "john@example.com"
-    //             },
-    //             "line_items": [  
-    //                 {
-    //                     "id": 'rug-001',
-    //                     "sku": 'rug-001',
-    //                     "line_item_id": 'rug-001',
-    //                     "variant_id": 'rug-001',
-    //                     "inventory_item_id": 'rug-001',
-    //                     "quantity": 2,
-    //                     "fulfillable_quantity": 2
-    //                 }
-    //             ],
-    //             "created_at": "2026-04-21T10:00:00Z",
-    //             "updated_at": "2026-04-21T10:00:00Z"
-    //         }
-    //     ]
-    // };
+    // const { data } = await client.get(`/orders/${String(orderId)}/fulfillment_orders.json`);
+    const data = {
+        "fulfillment_orders": [
+            {
+                "id": 1046000804,
+                "order_id": 450789460,
+                "status": "open",
+                "request_status": "unsubmitted",
+                "assigned_location_id": 'clouds-tex-001',
+                "destination": {
+                    "first_name": "John",
+                    "last_name": "Doe",
+                    "address1": "12 Abbas El Akkad St",
+                    "address2": null,
+                    "city": "Cairo",
+                    "province": "Cairo",
+                    "country": "Egypt",
+                    "zip": "11765",
+                    "phone": "+20123456789",
+                    "email": "john@example.com"
+                },
+                "line_items": [
+                    {
+                        "id": 'rug-001',
+                        "sku": 'rug-001',
+                        "line_item_id": 'rug-001',
+                        "variant_id": 'rug-001',
+                        "inventory_item_id": 'rug-001',
+                        "quantity": 2,
+                        "fulfillable_quantity": 2
+                    }
+                ],
+                "created_at": "2026-04-21T10:00:00Z",
+                "updated_at": "2026-04-21T10:00:00Z"
+            }
+        ]
+    };
 
 
     const fulfillment_orders = data?.fulfillment_orders ?? [];

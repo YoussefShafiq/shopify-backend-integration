@@ -1,8 +1,9 @@
-function successResponse({ res, data, message = 'success', statusCode = 200 }) {
+function successResponse({ res, data, message = 'success', statusCode = 200, payload }) {
     return res.status(statusCode).json({
         success: true,
         message,
-        data
+        data,
+        payload
     })
 }
 
