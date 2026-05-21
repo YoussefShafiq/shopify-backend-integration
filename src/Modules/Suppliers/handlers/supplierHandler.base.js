@@ -1,3 +1,4 @@
+import axios from "axios";
 import { findOne } from "../../../DB/Repository/get.repo.js";
 import supplierModel from "../../../DB/Models/supplier.model.js";
 import { notFoundException, unhandledException } from "../../../utils/response/failResponse.js";
@@ -79,6 +80,21 @@ export class SupplierHandler {
         if (name) payload.vendor = name;
     }
 
+    /** Update webhook: product missing on Shopify → same path as create. */
+    async createProductWhenUpdateTargetMissing({ product, supplier }) {
+        const result = await this.onProductCreate({ product, supplier });
+        const data =
+            result.data && typeof result.data === "object"
+                ? { ...result.data, createdViaUpdateFallback: true }
+                : result.data;
+        return {
+            ...result,
+            data,
+            message: "Shopify product not found; created instead of update",
+            statusCode: 201,
+        };
+    }
+
     async onProductCreate({ product, supplier }) {
         const payload = await this.mapProductForShopify(product);
         this.applySupplierVendor({ supplier, payload });
@@ -106,14 +122,32 @@ export class SupplierHandler {
     }
 
     async onProductUpdate({ productId, product, supplier }) {
-        const shopifyProductId = await this.resolveProductIdToShopifyProductId(productId);
+        let shopifyProductId;
+        try {
+            shopifyProductId = await this.resolveProductIdToShopifyProductId(productId);
+        } catch (err) {
+            if (err?.cause?.statusCode === 404) {
+                return this.createProductWhenUpdateTargetMissing({ product, supplier });
+            }
+            throw err;
+        }
+
         const payload = await this.mapProductForShopify(product);
         this.applySupplierVendor({ supplier, payload });
 
         const imagesToUpload = Array.isArray(payload.images) ? [...payload.images] : [];
         if (payload.images) delete payload.images;
 
-        let data = await updateShopifyProduct(shopifyProductId, payload);
+        let data;
+        try {
+            data = await updateShopifyProduct(shopifyProductId, payload);
+        } catch (err) {
+            if (axios.isAxiosError(err) && err.response?.status === 404) {
+                return this.createProductWhenUpdateTargetMissing({ product, supplier });
+            }
+            throw err;
+        }
+
         if (imagesToUpload.length) {
             const current = await getShopifyProduct(shopifyProductId);
             for (const existing of current?.images ?? []) {
