@@ -29,6 +29,9 @@ export async function resolveSupplierHandlerForWebhook({ supplier_code }) {
     const code = typeof supplier_code === "string" ? supplier_code.trim() : "";
 
     if (code) {
+        console.log("[resolveSupplierHandlerForWebhook] Resolving by supplier_code", {
+            supplier_code: code,
+        });
         const supplier = await findOne(supplierModel, {
             shopify_location_id: code,
             isDeleted: { $ne: true },
@@ -36,6 +39,12 @@ export async function resolveSupplierHandlerForWebhook({ supplier_code }) {
         if (!supplier) {
             notFoundException(`Supplier not found for supplier_code "${code}"`);
         }
+        console.log("[resolveSupplierHandlerForWebhook] Resolved supplier", {
+            _id: String(supplier?._id ?? ""),
+            shopify_location_id: supplier?.shopify_location_id,
+            tracksInventory: supplier?.tracksInventory,
+            type: supplier?.type,
+        });
         return {
             handler: getSupplierHandler(supplier),
             supplier,

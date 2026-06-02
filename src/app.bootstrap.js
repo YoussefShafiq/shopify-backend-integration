@@ -23,6 +23,8 @@ import shopifyRouter from "./Modules/Shopify/shopify.controller.js";
 import supplierShopifyWebhookRouter from "./Modules/Suppliers/supplierShopifyWebhook.controller.js";
 
 import { warmShopifyAccessToken } from "./Modules/Shopify/shopifyToken.service.js";
+import { findById } from "./DB/Repository/get.repo.js";
+import supplierModel from "./DB/Models/supplier.model.js";
 
 
 
@@ -37,8 +39,6 @@ export default async function bootstrap() {
     await warmShopifyAccessToken();
 
     app.use("/shopify", express.raw({ type: "application/json" }));
-
-
 
     app.use(express.json({ limit: process.env.JSON_BODY_LIMIT || "50mb" }), cors(), helmet());
 

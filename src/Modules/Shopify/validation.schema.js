@@ -10,3 +10,19 @@ export const orderWebhookSchema = {
         .unknown(true)
         .required(),
 };
+
+const shopifyReturnId = Joi.alternatives(Joi.string(), Joi.number()).required();
+
+/** Shopify `returns/request` webhook; require return id + nested order id. */
+export const returnRequestWebhookSchema = {
+    body: Joi.object({
+        id: shopifyReturnId,
+        order: Joi.object({
+            id: shopifyOrderId,
+        })
+            .unknown(true)
+            .required(),
+    })
+        .unknown(true)
+        .required(),
+};

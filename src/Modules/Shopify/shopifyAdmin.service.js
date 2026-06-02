@@ -568,7 +568,7 @@ export async function setShopifyInventoryLevel({ locationId, inventoryItemId, av
         inventory_item_id: Number.isFinite(invNum) ? invNum : inventoryItemId,
         available,
     };
-    console.log({ setShopifyInventoryLevel_PAYLOAD: payload });
+    console.log("[setShopifyInventoryLevel] Request payload", payload);
     try {
         const { data } = await client.post(`/inventory_levels/set.json`, payload);
         return data;
@@ -582,6 +582,53 @@ export async function setShopifyInventoryLevel({ locationId, inventoryItemId, av
         }
         throw err;
     }
+}
+
+/**
+ * Sets a Shopify variant to "Inventory not tracked" by SKU (best-effort).
+ * This is used when a supplier does not track inventory but still calls inventory webhooks.
+ *
+ * @param {string} sku
+ */
+export async function setShopifyVariantInventoryNotTrackedBySku(sku) {
+    const rawSku = typeof sku === "string" ? sku.trim() : "";
+    if (!rawSku) throw unhandledException("sku is required");
+
+    const safe = rawSku.replace(/\\/g, "\\\\").replace(/"/g, '\\"');
+    const searchQuery = `sku:"${safe}"`;
+
+    const gql = `
+query VariantBySku($query: String!) {
+  productVariants(first: 5, query: $query) {
+    nodes {
+      legacyResourceId
+      sku
+      inventoryManagement
+    }
+  }
+}
+`;
+    const gqlData = await shopifyGraphql(gql, { query: searchQuery });
+    const nodes = gqlData?.productVariants?.nodes ?? [];
+    const match = nodes.find((n) => String(n?.sku ?? "").trim() === rawSku) ?? nodes[0];
+    const legacyId = match?.legacyResourceId;
+    if (legacyId == null) {
+        throw notFoundException(`No Shopify variant found for sku "${rawSku}"`);
+    }
+
+    const variantId = Number(legacyId);
+    if (!Number.isFinite(variantId)) {
+        throw unhandledException(`Invalid Shopify variant legacyResourceId for sku "${rawSku}"`);
+    }
+
+    const client = getShopifyAdminClient();
+    const payload = { variant: { id: variantId, inventory_management: null } };
+    console.log("[setShopifyVariantInventoryNotTrackedBySku] Updating variant", {
+        sku: rawSku,
+        variantId,
+    });
+    const { data } = await client.put(`/variants/${variantId}.json`, payload, { timeout: 30_000 });
+    return data?.variant;
 }
 
 /**

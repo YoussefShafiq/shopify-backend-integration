@@ -11,6 +11,7 @@ import {
     updateShopifyProduct,
     deleteShopifyProduct,
     setShopifyInventoryLevel,
+    setShopifyVariantInventoryNotTrackedBySku,
     createShopifyFulfillmentForFulfillmentOrder,
 } from "../../Shopify/shopifyAdmin.service.js";
 
@@ -35,10 +36,21 @@ export class SupplierHandler {
         throw unhandledException("createSupplierOrderFromFulfillmentOrder is not implemented");
     }
 
+    /**
+     * Notify supplier of return line items routed to their fulfillment location.
+     * @param {object} params
+     * @param {object} params.returnPayload Full Shopify returns/request webhook body
+     * @param {object} params.supplier Supplier DB record
+     * @param {object} params.group Group from return routing (assignedLocationId, fulfillmentOrder, items)
+     */
+    async createSupplierReturnFromShopifyReturn({ returnPayload, supplier, group }) {
+        throw unhandledException("createSupplierReturnFromShopifyReturn is not implemented");
+    }
+
     // --- Supplier → Shopify (webhooks): hooks for subclasses ---
 
     /** Map supplier webhook `product` to Shopify REST product payload. */
-    async mapProductForShopify(product) {
+    async mapProductForShopify(product, supplier) {
         throw unhandledException("mapProductForShopify is not implemented");
     }
 
@@ -80,6 +92,16 @@ export class SupplierHandler {
         if (name) payload.vendor = name;
     }
 
+    applySupplierInventoryTracking({ supplier, payload }) {
+        if (!supplier || supplier.tracksInventory !== false) return;
+        if (!payload || typeof payload !== "object") return;
+        if (!Array.isArray(payload.variants)) return;
+        for (const v of payload.variants) {
+            if (!v || typeof v !== "object") continue;
+            v.inventory_management = null;
+        }
+    }
+
     /** Update webhook: product missing on Shopify → same path as create. */
     async createProductWhenUpdateTargetMissing({ product, supplier }) {
         const result = await this.onProductCreate({ product, supplier });
@@ -96,8 +118,9 @@ export class SupplierHandler {
     }
 
     async onProductCreate({ product, supplier }) {
-        const payload = await this.mapProductForShopify(product);
+        const payload = await this.mapProductForShopify(product, supplier);
         this.applySupplierVendor({ supplier, payload });
+        this.applySupplierInventoryTracking({ supplier, payload });
 
         const imagesToUpload = Array.isArray(payload.images) ? [...payload.images] : [];
         if (payload.images) delete payload.images;
@@ -132,8 +155,9 @@ export class SupplierHandler {
             throw err;
         }
 
-        const payload = await this.mapProductForShopify(product);
+        const payload = await this.mapProductForShopify(product, supplier);
         this.applySupplierVendor({ supplier, payload });
+        this.applySupplierInventoryTracking({ supplier, payload });
 
         const imagesToUpload = Array.isArray(payload.images) ? [...payload.images] : [];
         if (payload.images) delete payload.images;
@@ -200,6 +224,52 @@ export class SupplierHandler {
     }
 
     async onInventorySet(body, supplier) {
+        console.log("[SupplierHandler.onInventorySet] Enter", {
+            supplierId: supplier?._id ? String(supplier._id) : null,
+            supplierShopifyLocationId: supplier?.shopify_location_id,
+            tracksInventory: supplier?.tracksInventory,
+            hasSupplier: Boolean(supplier),
+            body: {
+                locationId: body?.locationId,
+                inventoryItemId: body?.inventoryItemId,
+                available: body?.available,
+                supplier_code: body?.supplier_code,
+            },
+        });
+        if (supplier && supplier.tracksInventory === false) {
+            console.log(
+                "[SupplierHandler.onInventorySet] Skipping inventory update because supplier.tracksInventory === false",
+            );
+            const sku = typeof body?.sku === "string" ? body.sku.trim() : "";
+            if (sku) {
+                try {
+                    await setShopifyVariantInventoryNotTrackedBySku(sku);
+                } catch (err) {
+                    console.warn(
+                        "[SupplierHandler.onInventorySet] Failed to set inventory not tracked for sku",
+                        { sku, message: err?.message },
+                    );
+                }
+            } else {
+                console.warn(
+                    "[SupplierHandler.onInventorySet] Missing sku; cannot auto-set inventory not tracked for variant",
+                );
+            }
+            return {
+                data: {
+                    skipped: true,
+                    reason: "SUPPLIER_NOT_TRACKING_INVENTORY",
+                    supplierId: String(supplier?._id ?? ""),
+                    supplierCode: supplier?.shopify_location_id ?? null,
+                    sku: sku || null,
+                },
+                message: sku
+                    ? "Supplier does not track inventory; set Shopify variant to not track inventory and skipped inventory update"
+                    : "Supplier does not track inventory; skipped Shopify inventory update (send sku to auto-set variant inventory not tracked)",
+                statusCode: 200,
+            };
+        }
+
         const { locationId, inventoryItemId, available, supplier_code, ...rest } = body;
         const shopifyLocationId = await this.resolveLocationIdToShopifyLocationId({
             locationId,

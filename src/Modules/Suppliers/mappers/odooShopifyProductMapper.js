@@ -40,6 +40,6 @@ export function expandOdooImageAttachmentBase64(raw) {
 }
 
 /** Odoo supplier webhook `product` → Shopify REST `product` payload. */
-export async function mapOdooProductForShopify(product) {
-    return mapSupplierProductForShopify(product, expandOdooImageAttachmentBase64);
+export async function mapOdooProductForShopify(product, supplier) {
+    return mapSupplierProductForShopify(product, expandOdooImageAttachmentBase64, supplier);
 }

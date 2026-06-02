@@ -32,6 +32,10 @@ const supplierSchema = new Schema({
     },
     phone: {
         type: String
+    },
+    tracksInventory: {
+        type: Boolean,
+        default: true,
     }
 }, {
     timestamps: true,

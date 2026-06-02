@@ -2,9 +2,11 @@ import { Router } from "express";
 import { shopifyValidation } from "../../Middlewares/shopify/shopifyValidation.middleware.js";
 import { parseBody } from "../../Middlewares/shopify/shopifyBodyParser.middleware.js";
 import { validation } from "../../Middlewares/validation.middleware.js";
-import { orderWebhookSchema } from "./validation.schema.js";
+import { orderWebhookSchema, returnRequestWebhookSchema } from "./validation.schema.js";
 import { upsertShopifyOrderFromWebhook } from "./order.service.js";
+import { upsertShopifyReturnFromWebhook } from "./return.service.js";
 import { getFulfillmentByOrderId } from "./shopify.service.js";
+import { processReturnRequestWebhook } from "./returnRouting.service.js";
 
 const shopifyRouter = Router();
 
@@ -35,6 +37,37 @@ shopifyRouter.post(
 
         return res.status(200).json({ message: "Webhook received" });
     }
+);
+
+shopifyRouter.post(
+    "/webhook/returns/request",
+    shopifyValidation(),
+    parseBody,
+    validation(returnRequestWebhookSchema),
+    async (req, res) => {
+        const { id, order } = req.body;
+        try {
+            await upsertShopifyReturnFromWebhook(req.body);
+        } catch (err) {
+            console.error("[Shopify webhook] Failed to persist return", {
+                returnId: id,
+                orderId: order?.id,
+                message: err?.message,
+                stack: err?.stack,
+            });
+        }
+
+        processReturnRequestWebhook(req.body).catch((err) => {
+            console.error("[Shopify webhook] Failed to route return to suppliers", {
+                returnId: id,
+                orderId: order?.id,
+                message: err?.message,
+                stack: err?.stack,
+            });
+        });
+
+        return res.status(200).json({ message: "Webhook received" });
+    },
 );
 
 export default shopifyRouter;

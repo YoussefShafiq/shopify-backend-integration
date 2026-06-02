@@ -49,7 +49,7 @@ const SHOPIFY_PRODUCT_ROOT_KEYS = new Set([
     "options",
 ]);
 
-export function mapSupplierVariantForShopify(variant, index, total) {
+export function mapSupplierVariantForShopify(variant, index, total, supplier) {
     const out = {};
     if (variant.option1 != null && variant.option1 !== "") out.option1 = variant.option1;
     else if (variant.option2 == null && variant.option3 == null && total === 1) {
@@ -61,9 +61,41 @@ export function mapSupplierVariantForShopify(variant, index, total) {
     if (variant.sku != null && variant.sku !== "") out.sku = variant.sku;
     if (variant.barcode != null && variant.barcode !== "") out.barcode = variant.barcode;
     if (variant.id != null && variant.id !== "") out.id = variant.id;
-    (variant.inventory_management != null)
-        ? (out.inventory_management = variant.inventory_management)
-        : (out.inventory_management = "shopify");
+    if (supplier?.tracksInventory === false) {
+        out.inventory_management = null;
+        console.log(`
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            ************************************ supplier does not track inventory ************************************
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            `);
+    } else {
+        (variant.inventory_management != null)
+            ? (out.inventory_management = variant.inventory_management)
+            : (out.inventory_management = "shopify");
+    }
     if (variant.inventory_policy != null) out.inventory_policy = variant.inventory_policy;
     if (variant.fulfillment_service != null) out.fulfillment_service = variant.fulfillment_service;
     if (variant.requires_shipping != null) out.requires_shipping = variant.requires_shipping;
@@ -180,7 +212,7 @@ export async function mapSupplierImageForShopify(img, index, normalizeAttachment
  * @param {object} product
  * @param {(raw: unknown) => string} normalizeAttachment
  */
-export async function mapSupplierProductForShopify(product, normalizeAttachment) {
+export async function mapSupplierProductForShopify(product, normalizeAttachment, supplier) {
     if (!product || typeof product !== "object") return product;
     const shopifyProduct = {};
     for (const key of SHOPIFY_PRODUCT_ROOT_KEYS) {
@@ -188,7 +220,9 @@ export async function mapSupplierProductForShopify(product, normalizeAttachment)
     }
     if (Array.isArray(product.variants)) {
         const n = product.variants.length;
-        shopifyProduct.variants = product.variants.map((v, i) => mapSupplierVariantForShopify(v, i, n));
+        shopifyProduct.variants = product.variants.map((v, i) =>
+            mapSupplierVariantForShopify(v, i, n, supplier),
+        );
     }
     if (Array.isArray(product.metafields)) {
         shopifyProduct.metafields = product.metafields.map(mapSupplierMetafieldForShopify);
