@@ -12,7 +12,7 @@ const shopifyRouter = Router();
 
 shopifyRouter.post(
     "/webhook/orders/create",
-    shopifyValidation(),
+    // shopifyValidation(),
     parseBody,
     validation(orderWebhookSchema),
     async (req, res) => {
