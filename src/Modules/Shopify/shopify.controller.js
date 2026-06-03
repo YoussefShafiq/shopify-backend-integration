@@ -17,6 +17,7 @@ shopifyRouter.post(
     validation(orderWebhookSchema),
     async (req, res) => {
         const { id } = req.body;
+        console.log("order create webhook received", req.body);
         try {
             await upsertShopifyOrderFromWebhook(req.body);
         } catch (err) {
