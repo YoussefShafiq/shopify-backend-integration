@@ -16,6 +16,7 @@ import {
     onSupplierFulfillmentCreate,
 } from "./supplierShopifyWebhook.service.js";
 import { listShopifyLocations } from "../Shopify/shopifyAdmin.service.js";
+import supplierModel from "../../DB/Models/supplier.model.js";
 
 const supplierShopifyWebhookRouter = Router();
 
@@ -35,6 +36,15 @@ supplierShopifyWebhookRouter.get("/shopify/locations", async (req, res, next) =>
             message: "Shopify locations",
             statusCode: 200,
         });
+    } catch (err) {
+        next(err);
+    }
+});
+
+supplierShopifyWebhookRouter.get("/shopify/suppliers", async (req, res, next) => {
+    try {
+        const suppliers = await find(supplierModel);
+        successResponse({ res, data: { suppliers }, message: "Suppliers", statusCode: 200 });
     } catch (err) {
         next(err);
     }
