@@ -28,13 +28,16 @@ shopifyRouter.post(
             });
         }
 
-        getFulfillmentByOrderId(id).catch((err) => {
+        // Await FO processing so serverless (Lambda/Vercel) does not freeze after res.json().
+        try {
+            await getFulfillmentByOrderId(id);
+        } catch (err) {
             console.error("[Shopify webhook] Failed to process fulfillment orders", {
                 orderId: id,
                 message: err?.message,
                 stack: err?.stack,
             });
-        });
+        }
 
         return res.status(200).json({ message: "Webhook received" });
     }

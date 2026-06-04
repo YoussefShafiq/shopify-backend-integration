@@ -4,6 +4,15 @@ import { resolveSupplierByAssignedLocationId } from "./supplierResolution.servic
 
 export async function getFulfillmentByOrderId(orderId) {
     const fulfillment_orders = await fetchFulfillmentOrdersByOrderId(orderId);
+    if (fulfillment_orders.length === 0) {
+        console.warn("[getFulfillmentByOrderId] No fulfillment orders yet", { orderId: String(orderId) });
+        return;
+    }
+    console.log("[getFulfillmentByOrderId] Processing fulfillment orders", {
+        orderId: String(orderId),
+        count: fulfillment_orders.length,
+        assignedLocationIds: fulfillment_orders.map((fo) => fo?.assigned_location_id),
+    });
     await Promise.all(fulfillment_orders.map((fo) => handleFulfillmentOrder(fo)));
 }
 
